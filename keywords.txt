@@ -1,0 +1,22 @@
+#######################################
+# Syntax Coloring Map
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+ZzzMotor	KEYWORD1	ZzzMotor
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+stop	KEYWORD2
+go	KEYWORD2
+goMs	KEYWORD2
+setSpeed	KEYWORD2
+isRunning	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################

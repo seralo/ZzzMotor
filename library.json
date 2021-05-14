@@ -1,0 +1,13 @@
+{
+  "name": "ZzzMotor",
+  "keywords": "motor",
+  "description": "Simple Arduino / C++ library to manage motors",
+  "authors": {
+    "name": "Seralo",
+    "email": "seralo@free.fr",
+    "url": "https://github.com/seralo/ZzzMotor"
+  },
+  "version": "1.0.0",
+  "frameworks": "arduino",
+  "platforms": "*"
+}
