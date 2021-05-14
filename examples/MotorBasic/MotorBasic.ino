@@ -1,8 +1,8 @@
-#include <ZzzStepper.h>
+#include <ZzzMotor.h>
 #include <Wire.h>
 
-ZzzMotorDriverDirectionPWM<26, 36> motorDriver();
-ZzzStepper stepper(motorDriver);
+ZzzMotorDriverDirectionPWM<26, 36> motorDriver;
+ZzzMotor motor(motorDriver);
 
 int nbSeconds=0;
 
