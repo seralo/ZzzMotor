@@ -30,7 +30,7 @@ bool isRunning();         // Is the motor running (not stopped)
 
 ### Included examples
 
-- `MotorBasic/MotorBasic.ino` - Show basic usage running for 10 seconds
+- `MotorBasic/MotorBasic.ino` - Show basic usage changing speed and direction.
 
 
 ### Simple code example 
@@ -38,8 +38,8 @@ bool isRunning();         // Is the motor running (not stopped)
 ```cpp
 #include <ZzzMotor.h>
 
-//Basic driver on 2 pin connected here to PIN 16 (direction), PIN 17 (speed PWM)
-ZzzMotorDriverDirectionPWM<16, 17> motorDriver;
+//Basic driver on 2 pins connected here to PIN 32 (forward pin), PIN 33 (backward pin)
+ZzzMotorDriver2PinsPWM<32, 33> motorDriver;
 ZzzMotor motor(motorDriver);
 
 void setup()

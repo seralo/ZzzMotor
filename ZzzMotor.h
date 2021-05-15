@@ -33,10 +33,119 @@ class ZzzMotorDriver {
 
 
 /**
- * PIN_DIRECTION specify the pin to control the motor direction
- * PIN_PWM specify the pin to control the speed
+ * Only full speed (100%) or stop
+ * Suitable for L9110 / HG7881, Two relays setup...
+ *
+ * @param PIN_IN1 specify the first pin (control forward)
+ * @param PIN_IN2 specify the second pin (control backward)
+ *
+ * PIN_IN1  PIN_IN2  State
+ * HIGH     LOW      Forward
+ * LOW      HIGH     Backward
+ * LOW      LOW      Stop
+ * HIGH     HIGH     (Combination not used here)
  */
-template <int PIN_DIRECTION, int PIN_PWM, int ESP32_LEDC_CHANNEL=1, int ESP32_LEDC_FREQ=1000> class ZzzMotorDriverDirectionPWM : public ZzzMotorDriver {
+template <int PIN_IN1, int PIN_IN2> class ZzzMotorDriver2Pins : public ZzzMotorDriver {
+	public:
+		ZzzMotorDriver2Pins() {
+			pinMode(PIN_IN1, OUTPUT);
+			pinMode(PIN_IN2, OUTPUT);
+			stop();
+		}
+
+		virtual int checkSpeed(int speed) {
+			if (speed<0 || speed>100) {
+				return -1;
+			}
+			if (speed>=50) {
+				return 100;
+			}
+			return 0;
+		}
+
+		virtual bool stop() override {
+			digitalWrite(PIN_IN1, LOW);
+			digitalWrite(PIN_IN2, LOW);
+			return true;
+		}
+
+		virtual bool go(bool cw, int speed) override {
+			if (speed==0) {
+				return stop();
+			}
+			digitalWrite(cw ? PIN_IN1 : PIN_IN2, HIGH);
+			digitalWrite(cw ? PIN_IN2 : PIN_IN1, LOW);
+			return true;
+		}
+};
+
+/**
+ * Like ZzzMotorDriver2Pins but use PWM to control speed
+ * Suitable for L9110 / HG7881...
+ *
+ * @param PIN_IN1 specify the first pin (control forward)
+ * @param PIN_IN2 specify the second pin (control backward)
+ *
+ * For ESP32 if you use several motors or use ledc functions in your program, you must define ESP32_LEDC_CHANNEL1, ESP32_LEDC_CHANNEL2 optionnaly ESP32_LEDC_FREQ.
+ *
+ * PIN_IN1  PIN_IN2  State
+ * PWM      LOW      Forward
+ * LOW      PWM      Backward
+ * LOW      LOW      Stop
+ */
+template <int PIN_IN1, int PIN_IN2, int ESP32_LEDC_CHANNEL1=0, int ESP32_LEDC_CHANNEL2=1, int ESP32_LEDC_FREQ=5000> class ZzzMotorDriver2PinsPWM : public ZzzMotorDriver {
+	public:
+		ZzzMotorDriver2PinsPWM() {
+			#if defined(ARDUINO_ARCH_ESP32)
+	  			ledcSetup(ESP32_LEDC_CHANNEL1, ESP32_LEDC_FREQ, 8);
+	  			ledcSetup(ESP32_LEDC_CHANNEL2, ESP32_LEDC_FREQ, 8);
+				ledcAttachPin(PIN_IN1, ESP32_LEDC_CHANNEL1);
+				ledcAttachPin(PIN_IN2, ESP32_LEDC_CHANNEL2);
+			#else
+				pinMode(PIN_IN1, OUTPUT);
+				pinMode(PIN_IN2, OUTPUT);
+			#endif
+			stop();
+		}
+
+		virtual bool stop() override {
+			#if defined(ARDUINO_ARCH_ESP32)
+				ledcWrite(ESP32_LEDC_CHANNEL1, 0);
+				ledcWrite(ESP32_LEDC_CHANNEL2, 0);
+			#else
+				digitalWrite(PIN_IN1, HIGH);
+				digitalWrite(PIN_IN2, HIGH);
+			#endif
+			return true;
+		}
+
+		virtual bool go(bool cw, int speed) override {
+			if (speed==0) {
+				return stop();
+			}
+			int pwm=map(speed, 0, 100, 0, 255);
+			#if defined(ARDUINO_ARCH_ESP32)
+				int chSpeed=cw ? ESP32_LEDC_CHANNEL1 : ESP32_LEDC_CHANNEL2;
+				int chLow=cw ? ESP32_LEDC_CHANNEL2 : ESP32_LEDC_CHANNEL1;
+				ledcWrite(chLow, 0);
+				ledcWrite(chSpeed, pwm);
+			#else
+				int pinSpeed=cw ? PIN_IN1 : PIN_IN2;
+				int pinLow=cw ? PIN_IN2 : PIN_IN1;
+				digitalWrite(pinLow, LOW);
+				analogWrite(pinSpeed, pwm);
+			#endif
+			return true;
+		}
+};
+
+
+
+/**
+ * @param PIN_DIRECTION specify the pin to control the motor direction
+ * @param PIN_PWM specify the pin to control the speed
+ */
+template <int PIN_DIRECTION, int PIN_PWM, int ESP32_LEDC_CHANNEL=0, int ESP32_LEDC_FREQ=5000> class ZzzMotorDriverDirectionPWM : public ZzzMotorDriver {
 	public:
 		ZzzMotorDriverDirectionPWM() {
 			pinMode(PIN_DIRECTION, OUTPUT);
@@ -49,23 +158,22 @@ template <int PIN_DIRECTION, int PIN_PWM, int ESP32_LEDC_CHANNEL=1, int ESP32_LE
 		}
 
 		virtual bool stop() override {
-			digitalWrite(PIN_PWM, LOW);
+			#if defined(ARDUINO_ARCH_ESP32)
+				ledcWrite(ESP32_LEDC_CHANNEL, 0);
+			#else
+				digitalWrite(PIN_PWM, LOW);
+			#endif
 			return true;
 		}
 
 		virtual bool go(bool cw, int speed) override {
 			digitalWrite(PIN_DIRECTION, cw ? HIGH : LOW);
-			if (speed==100) {
-				digitalWrite(PIN_PWM, HIGH);
-			}
-			else {
-				int pwm=map(speed, 0, 100, 0, 255);
-				#if defined(ARDUINO_ARCH_ESP32)
-					ledcWrite(PIN_PWM, pwm);
-				#else
-					analogWrite(PIN_PWM, pwm);
-				#endif
-			}
+			int pwm=map(speed, 0, 100, 0, 255);
+			#if defined(ARDUINO_ARCH_ESP32)
+				ledcWrite(ESP32_LEDC_CHANNEL, pwm);
+			#else
+				analogWrite(PIN_PWM, pwm);
+			#endif
 			return true;
 		}
 };
@@ -119,7 +227,7 @@ template <typename WIRE, uint8_t MOTOR_PORT, uint8_t ADDRESS=ZZZ_DEFAULT_M5STACK
  * Class to manage a motor. The class need a Driver parameter to control the motor.
  * The driver class must implement stop(bool force), go(bool cw, speed) and checkSpeed(speed).
  *
- * TODO do driver call in update ? to limit too rapid motor change
+ * TODO call driver functions in update() ? to limit too rapid motor change
  * NOTE (going full speed clockwise, then full speed the other way may break the motor, could add timing limit defined in the driver)
  */
 class ZzzMotor {
@@ -199,14 +307,14 @@ class ZzzMotor {
 
 		/** Set motor speed. If the motor is running speed will be adjusted. */
 		int setSpeed(int speed) {
-			int validSpeed=_pDriver->checkSpeed(speed);
-			if (validSpeed!=-1) {
-				_speed=validSpeed;
+			int checkedSpeed=_pDriver->checkSpeed(speed);
+			if (checkedSpeed!=-1) {
+				_speed=checkedSpeed;
 				if (_state!=STATE_STOP) {
 					_pDriver->go(((_state & STATE_CW) == 1), _speed);
 				}
 			}
-			return validSpeed;
+			return checkedSpeed;
 		}
 
 		/** Constructor */
