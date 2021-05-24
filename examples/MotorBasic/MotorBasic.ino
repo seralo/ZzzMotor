@@ -17,7 +17,7 @@ void motorEvent() {
 
 	if (nbSteps>=20) {
 		Serial.println("Stop");
-		//motor.stop(); //is not be needed goMs() call stop after given ms();
+		//motor.stop(); //is not needed goMs() call stop after given ms();
 		return;
  	}
 	switch(nbSteps%5) {

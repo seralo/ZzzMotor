@@ -4,6 +4,18 @@
 #ifndef ZZZ_MOTOR_H
 #define ZZZ_MOTOR_H
 
+//M5Stack PBHUB default address
+#define ZZZ_M5STACKPBHUB_ADDRESS 0x61
+//M5Stack PBHUB ports 1-6
+#define ZZZ_M5STACKPBHUB0        0x40
+#define ZZZ_M5STACKPBHUB1        0x50
+#define ZZZ_M5STACKPBHUB2        0x60
+#define ZZZ_M5STACKPBHUB3        0x70
+#define ZZZ_M5STACKPBHUB4        0x80
+#define ZZZ_M5STACKPBHUB5        0xA0
+
+
+
 typedef void(*ZzzMotorCallback)();
 
 /** Abstract motor driver. Class to override to implement a new motor driver */
@@ -113,8 +125,8 @@ template <int PIN_IN1, int PIN_IN2, int ESP32_LEDC_CHANNEL1=0, int ESP32_LEDC_CH
 				ledcWrite(ESP32_LEDC_CHANNEL1, 0);
 				ledcWrite(ESP32_LEDC_CHANNEL2, 0);
 			#else
-				digitalWrite(PIN_IN1, HIGH);
-				digitalWrite(PIN_IN2, HIGH);
+				digitalWrite(PIN_IN1, LOW);
+				digitalWrite(PIN_IN2, LOW);
 			#endif
 			return true;
 		}
@@ -139,6 +151,52 @@ template <int PIN_IN1, int PIN_IN2, int ESP32_LEDC_CHANNEL1=0, int ESP32_LEDC_CH
 		}
 };
 
+/**
+ * Like ZzzMotorDriver2PinsPWM but connected to M5Stack PbHub over I2C
+ */
+template <typename WIRE, uint8_t MOTOR_PORT=ZZZ_M5STACKPBHUB0, uint8_t ADDRESS=ZZZ_M5STACKPBHUB_ADDRESS> class ZzzMotorDriver2PinsPbHub : public ZzzMotorDriver {
+	protected:
+		WIRE *_pWire;
+		const int COMMAND_A=0x02; //hub_a_wire_value_A: analog/pwm write command on A wire
+		const int COMMAND_B=0x03; //hub_a_wire_value_B: analog/pwm write command on B wire
+
+		bool sendAB(int dutyA, int dutyB){
+			_pWire->beginTransmission(ADDRESS);
+  			_pWire->write(MOTOR_PORT | COMMAND_A);
+  			_pWire->write(dutyA & 0xff);
+ 			if (_pWire->endTransmission() != 0) { //communication error
+ 				return false;
+			}
+			_pWire->beginTransmission(ADDRESS);
+  			_pWire->write(MOTOR_PORT | COMMAND_B);
+  			_pWire->write(dutyB & 0xff);
+ 			if (_pWire->endTransmission() != 0) { //communication error
+ 				return false;
+			}
+			return true;
+		}
+
+	public:
+		ZzzMotorDriver2PinsPbHub(WIRE* pParams) {
+			_pWire=pParams;
+			_pWire->begin();
+		}
+
+		virtual bool stop() override {
+			return sendAB(0, 0);
+		}
+
+		virtual bool go(bool cw, int speed) override {
+			if (speed==0) {
+				return stop();
+			}
+			int pwm=map(speed, 0, 100, 0, 255);
+			if (cw) {
+				return sendAB(pwm, 0);
+			}
+			return sendAB(0, pwm);
+		}
+};
 
 
 /**
@@ -178,48 +236,11 @@ template <int PIN_DIRECTION, int PIN_PWM, int ESP32_LEDC_CHANNEL=0, int ESP32_LE
 		}
 };
 
+
 /* FIXME to implement: continous servo */
 
 
-/* FIXME to implement
-template <typename WIRE, uint8_t MOTOR_PORT, uint8_t ADDRESS=ZZZ_DEFAULT_M5STACKPBHUB_ADDRESS> class ZzzMotorDriverM5StackPBHub : public ZzzMotorDriver {
-	protected:
-		WIRE *_pWire;
-	public:
-		ZzzMotorDriverM5StackPBHub(void* pParams) {
-			_pWire=(WIRE*)pParams;
-			_pWire->begin();
 
-			_pWire->beginTransmission(ADDRESS);
-  			_pWire->write(0);
- 			if (_pWire->endTransmission() != 0) { //communication error
- 				return;
-			}
-		}
-		
-		virtual bool stop() override {
-			if (force) {
-				_pWire->beginTransmission(ADDRESS);
-	  			_pWire->write(0);
-	 			if (_pWire->endTransmission() != 0) { //communication error
-	 				return false;
-				}
-			}
-			return true;
-		}
-
-		virtual bool go(bool cw, int speed) override {
-			uint8_t stepState;
-
-			stepState=_steps.nextStep( cw );
-			_pWire->beginTransmission(ADDRESS);
-	  		_pWire->write(stepState);
-	 		if (_pWire->endTransmission() != 0) { //communication error
-	 			return false;
-			}
-			return true;
-		}
-}; */
 
 
 
