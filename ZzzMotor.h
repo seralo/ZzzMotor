@@ -177,8 +177,8 @@ template <typename WIRE, uint8_t MOTOR_PORT=ZZZ_M5STACKPBHUB0, uint8_t ADDRESS=Z
 		}
 
 	public:
-		ZzzMotorDriver2PinsPbHub(WIRE* pParams) {
-			_pWire=pParams;
+		ZzzMotorDriver2PinsPbHub(WIRE& pParams) {
+			_pWire=&pParams;
 			_pWire->begin();
 		}
 
