@@ -303,7 +303,7 @@ class ZzzMotor {
 				return; //nothing to do
 			}
 			if ((_state & STATE_GO_TIME)==STATE_GO_TIME) {
-				if (millis() - _timerStartMs >_timerDurationMs) {
+				if (millis() - _timerStartMs >= _timerDurationMs) {
 					endAction();
 					return;
 				}
